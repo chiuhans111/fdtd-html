@@ -1,18 +1,71 @@
-<script setup>
-import * as tf from "@tensorflow/tfjs";
-import maxwell from "../FDTD/maxwell";
-import { fabric } from "fabric";
-</script>
 <template>
   <div>
     <div class="container">
-      <canvas id="fabric" ref="canvas_fabric"> </canvas>
-      <canvas id="wave" ref="canvas"> </canvas>
+      <div class="canvas-container">
+        <canvas id="fabric" ref="canvas_fabric"> </canvas>
+        <canvas id="wave" ref="canvas"> </canvas>
+      </div>
+      <div>
+        <button @click="pause = true" v-if="!pause">pause</button>
+        <button @click="pause = false" v-if="pause">continue</button>
+        <button @click="clear">clear</button>
+        <button @click="add('rect')">add rect</button>
+        <button @click="add('circle')">add circle</button>
+        <div class="menu">
+          <div class="menu_obj" v-for="(obj, i) in selected_object" :key="i">
+            {{ obj }}
+            <div class="row">
+              <label>x: </label>
+              <input type="text" v-model.number="obj.left" size="6" />
+              <label>y: </label>
+              <input type="text" v-model.number="obj.top" size="6" />
+            </div>
+
+            <!-- <div class="row">
+              <label>width: </label>
+              <input type="text" v-model.number="obj.width" size="6" />
+              <label>height: </label>
+              <input type="text" v-model.number="obj.height" size="6" />
+            </div> -->
+
+            <div class="row">
+              <label>scaleX: </label>
+              <input type="text" v-model.number="obj.scaleX" size="6" />
+              <label>scaleY: </label>
+              <input type="text" v-model.number="obj.scaleY" size="6" />
+            </div>
+
+            <div class="row">
+              <label>angle: </label>
+              <input type="text" v-model.number="obj.angle" size="6" />
+            </div>
+
+            <div class="row">
+              <label>index: </label>
+              <input type="text" v-model.number="obj.index" size="6" />
+            </div>
+            <div class="row">
+              <label>absorption: </label>
+              <input type="text" v-model.number="obj.absorption" size="6" />
+            </div>
+            <div class="row">
+              <label>emission: </label>
+              <input type="text" v-model.number="obj.emission" size="6" />
+            </div>
+
+            <div class="row">
+              <button @click="layerUp(obj)">UP</button>
+              <button @click="layerDown(obj)">DOWN</button>
+            </div>
+            <button @click="del(obj)">DELETE</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 <style scoped lang="scss">
-.container {
+.canvas-container {
   position: relative;
 
   canvas {
@@ -22,55 +75,33 @@ import { fabric } from "fabric";
   }
 
   #wave {
+    background-color: black;
+    border: solid 1px gray;
     pointer-events: none;
     mix-blend-mode: screen;
   }
 }
+
+.container {
+  display: flex;
+}
+
+.menu {
+  width: 300px;
+  margin-left: 10px;
+
+  &_obj {
+    border: solid 1px gray;
+    margin: 5px;
+    padding: 4px;
+  }
+}
 </style>
 <script>
-let border_size = 30;
-const pixel_W = 600;
-const pixel_H = 400;
-const sim_W = pixel_W + border_size * 2;
-const sim_H = pixel_H + border_size * 2;
-
-window.tf = tf;
-
-const dx = 1;
-const dt = 0.1;
-
-const W = sim_W * dx;
-const H = sim_H * dx;
-
-let x = tf.range(0, sim_W).mul(dx).cast("float32");
-let y = tf.range(0, sim_H).mul(dx).cast("float32");
-let grid = tf.meshgrid(x, y);
-console.log(grid[0]);
-
-let border = tf
-  .minimum(
-    tf.minimum(grid[0], grid[1]),
-    tf.minimum(tf.sub(W, grid[0]), tf.sub(H, grid[1]))
-  )
-  .div(border_size)
-  .clipByValue(0, 1);
-
-let dilation = border.sub(1).abs().mul(-0.05).exp().expandDims(2);
-let attenuation = border.sub(1).abs().mul(-0.1).exp().expandDims(2);
-
-console.log(border.shape);
-
-let fields = {
-  E: tf.zeros([sim_H, sim_W, 3]),
-  H: tf.zeros([sim_H, sim_W, 3]),
-  e: tf.ones([sim_H, sim_W, 1]),
-  u: tf.ones([sim_H, sim_W, 1]),
-  // gx: grid[0],
-  // gy: grid[1],
-  // border,
-  dilation,
-  attenuation,
-};
+import * as tf from "@tensorflow/tfjs";
+import FDTD from "../FDTD/fdtd";
+import { fabric } from "fabric";
+import { toRaw } from "vue";
 
 function norm_draw(data) {
   return tf.tidy(() => {
@@ -84,11 +115,19 @@ function norm_draw(data) {
   // return data.mul(20).clipByValue(0.5, 1.5).sub(0.5);
 }
 
-window.fields = fields;
+function inject_optics_prop(obj, index = 1.33, absorption = 0, emission = 0) {
+  obj.index = index;
+  obj.absorption = absorption;
+  obj.emission = emission;
+  obj.cornerSize = 6;
+}
 
+const fdtd = new FDTD();
+window.fields = fdtd.fields;
+let canvas_fabric = null;
 export default {
   data() {
-    return {
+    const data = {
       /**@type {HTMLCanvasElement} */
       canvas: null,
       /**@type {CanvasRenderingContext2D} */
@@ -97,39 +136,36 @@ export default {
       t: 0,
 
       /**@type {HTMLCanvasElement} */
-      canvas2: null,
+      canvas2: document.createElement("Canvas"),
       /**@type {CanvasRenderingContext2D} */
       ctx2: null,
+      pause: false,
+
+      selected_object: [],
     };
+
+    return data;
   },
   mounted() {
-    // Prepare Canvas
     this.canvas = this.$refs["canvas"];
-    this.canvas.width = sim_W;
-    this.canvas.height = sim_H;
+    this.ctx = this.canvas.getContext("2d");
+    this.ctx2 = this.canvas2.getContext("2d");
+    // Prepare Canvas
+    this.canvas.width = fdtd.sim_W;
+    this.canvas.height = fdtd.sim_H;
 
     // Prepare Secondary Canvas
-    this.canvas2 = document.createElement("Canvas");
-    this.canvas2.width = sim_W;
-    this.canvas2.height = sim_H;
-    this.ctx2 = this.canvas2.getContext("2d");
+    this.canvas2.width = fdtd.sim_W;
+    this.canvas2.height = fdtd.sim_H;
 
     // Prepare Fabric Canvas
+    canvas_fabric = new fabric.Canvas(this.$refs.canvas_fabric);
+    console.log(canvas_fabric);
 
-    this.canvas_fabric = new fabric.Canvas(this.$refs["canvas_fabric"]);
-    this.canvas_fabric.setWidth(sim_W);
-    this.canvas_fabric.setHeight(sim_H);
+    canvas_fabric.setHeight(fdtd.sim_H);
+    canvas_fabric.setWidth(fdtd.sim_W);
 
-    for (let i = 0; i < 10; i++) {
-      const rect = new fabric.Rect({
-        fill: "red",
-        width: 20,
-        height: 20,
-      });
-      this.canvas_fabric.add(rect);
-    }
-
-    window.canvas_fabric = this.canvas_fabric;
+    window.canvas_fabric = canvas_fabric;
 
     // Canvas Drawing
     const canvas = this.canvas2;
@@ -140,86 +176,160 @@ export default {
     ctx.beginPath();
     ctx.ellipse(canvas.width / 2, canvas.height / 2, 5, 5, 0, 0, Math.PI * 2);
     ctx.fill();
-    fields.E = tf.browser.fromPixels(canvas).cast("float32").div(255);
+    fdtd.fields.E = tf.browser.fromPixels(canvas).cast("float32").div(255);
 
-    // const index = 2;
-    // ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // ctx.fillStyle = "white";
-    // ctx.fillRect(100, 100, 50, 200);
-    // let device = tf.browser
-    //   .fromPixels(canvas)
-    //   .cast("float32")
-    //   .div(255)
-    //   .gather(1, 2)
-    //   .expandDims(2);
-    // fields.e = fields.e.add(device.mul(index ** 2 - 1));
-
-    // save();
     this.update();
-    addEventListener("mousedown", this.mousedown);
+
+    canvas_fabric.on("mouse:down", this.mousedown);
+    canvas_fabric.on("object:modified", this.modified);
+    canvas_fabric.on("selection:created", this.selected);
+    canvas_fabric.on("selection:updated", this.selected);
   },
   unmounted() {
     this.alive = false;
   },
   methods: {
+    layerUp(obj) {
+      canvas_fabric.bringFoward(toRaw(obj), true);
+    },
+    layerDown(obj) {
+      canvas_fabric.sendBackwards(toRaw(obj), true);
+    },
+    add(type) {
+      if (type == "circle") {
+        const obj = new fabric.Circle({
+          fill: "red",
+          width: 100,
+          height: 100,
+          radius: 100,
+        });
+        inject_optics_prop(obj);
+        canvas_fabric.add(obj);
+      } else if (type == "rect") {
+        const obj = new fabric.Rect({
+          fill: "red",
+          width: 100,
+          height: 100,
+          radius: 100,
+        });
+        inject_optics_prop(obj);
+        canvas_fabric.add(obj);
+      }
+    },
+    del(obj) {
+      console.log("delete", obj);
+      canvas_fabric.remove(toRaw(obj));
+      this.selected_object = this.selected_object.filter((x) => x !== obj);
+      this.$forceUpdate();
+    },
+    clear() {
+      fdtd.clear();
+    },
+    selected(e) {
+      console.log(e);
+      this.selected_object = e.selected;
+      this.$forceUpdate();
+    },
+    modified(e) {
+      console.log(e);
+      this.$forceUpdate();
+    },
     mousedown(e) {
-      const rect = this.canvas.getBoundingClientRect();
-      const x = e.x - rect.x;
-      const y = e.y - rect.y;
+      // console.log(e);
+      if (e.target) return;
+      const x = e.pointer.x;
+      const y = e.pointer.y;
 
       const ctx = this.ctx2;
       const canvas = this.canvas2;
+
       ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      ctx.fillStyle = "blue";
+      ctx.fillStyle = "white";
       ctx.beginPath();
       ctx.ellipse(x, y, 3, 3, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      let temp = fields.E.add(
-        tf.browser.fromPixels(canvas).cast("float32").div(255)
+      let temp = tf.tidy(() =>
+        fdtd.fields.E.add(
+          tf.browser.fromPixels(canvas).cast("float32").div(255)
+        )
       );
-      tf.dispose(fields.E);
-      fields.E = temp;
-
-      e.preventDefault();
+      tf.dispose(fdtd.fields.E);
+      fdtd.fields.E = temp;
     },
     update() {
-      // if (this.t > 400) return;
+      if (this.alive) setTimeout(this.update, 30);
+      if (this.pause) return;
 
-      // this.canvas_fabric.interactive = false;
-      // this.canvas_fabric.selection = false;
-      let index = 2;
+      // Set e
+      let results = tf.tidy(() => {
+        let objects = canvas_fabric.getObjects();
+
+        let max_index = 1;
+        let max_absorption = 0.1;
+        let max_emission = 0.1;
+
+        for (let obj of objects) {
+          max_index = Math.max(obj.index, max_index);
+          max_absorption = Math.max(obj.absorption, max_absorption);
+          max_emission = Math.max(obj.emission, max_emission);
+        }
+
+        for (let obj of objects) {
+          obj.original_fill = obj.fill;
+          obj.fill = `rgb(${(obj.index / max_index) * 255}, ${
+            (obj.emission / max_emission) * 255
+          }, ${(obj.absorption / max_absorption) * 255})`;
+          max_index = Math.max(obj.index, max_index);
+        }
+
+        canvas_fabric.renderAll();
+
+        let canvas_pixels = tf.browser
+          .fromPixels(canvas_fabric.toCanvasElement())
+          .cast("float32")
+          .div(255);
+
+        let epsilon = canvas_pixels
+          .gather(0, 2)
+          .expandDims(2)
+          .mul(max_index)
+          .maximum(1)
+          .pow(2);
+        let absorber = canvas_pixels
+          .gather(2, 2)
+          .expandDims(2)
+          .mul(max_absorption)
+          .sub(1)
+          .abs();
+        let emitter = canvas_pixels
+          .gather(1, 2)
+          .expandDims(2)
+          .mul(max_emission);
+
+        // for (let obj of objects) {
+        //   obj.fill = obj.original_fill;
+        // }
+
+        return [epsilon, absorber, emitter];
+      });
+
+      tf.dispose([fdtd.fields.e, fdtd.fields.absorption, fdtd.fields.emission]);
+      fdtd.fields.e = results[0];
+      fdtd.fields.absorption = results[1];
+      fdtd.fields.emission = results[2];
+
+      canvas_fabric.requestRenderAll();
 
       tf.engine().startScope();
+      fdtd.update();
 
-      tf.dispose(fields.e);
+      // tf.browser.toPixels(
+      //   fdtd.fields.e.gather(2, 2).clipByValue(0, 1),
+      //   this.canvas
+      // );
+      tf.browser.toPixels(norm_draw(fdtd.fields.E.gather(2, 2)), this.canvas);
 
-      fields.e = tf.tidy(() => {
-        let device = tf.browser
-          .fromPixels(this.canvas_fabric.toCanvasElement())
-          .cast("float32")
-          .div(255)
-          .gather(0, 2)
-          .expandDims(2);
-        this.canvas_fabric.requestRenderAll();
-
-        return tf.ones([sim_H, sim_W, 1]).add(device.mul(index ** 2 - 1));
-      });
-      if (this.alive) requestAnimationFrame(this.update);
-
-      for (let i = 0; i < 10; i++) {
-        this.t += dt;
-        maxwell(fields, dx, dt);
-      }
-
-      for (let i in fields) {
-        fields[i] = tf.keep(fields[i]);
-      }
-
-      tf.browser.toPixels(norm_draw(fields.E.gather(2, 2)), this.canvas);
-
-      // tf.browser.toPixels(norm_draw(fields.border), this.canvas);
-      // fields.E.pow(2).sum().print();
       tf.engine().endScope();
     },
   },

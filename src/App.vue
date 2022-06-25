@@ -3,7 +3,7 @@ import FdtdSim from "./components/fdtd-sim.vue";
 </script>
 
 <template>
-  <div>
+  <div class="main-container">
     <h1>FDTD simulator</h1>
     <div class="main">
       <FdtdSim></FdtdSim>
@@ -12,17 +12,12 @@ import FdtdSim from "./components/fdtd-sim.vue";
 </template>
 
 <style>
-html,
-body {
-  text-align: center;
-  margin: 0px;
-  width: 100%;
-  height: 100%;
-  background: black;
-  color: white;
-}
 .main {
   margin: auto;
   width: fit-content;
+}
+.main-container {
+  max-width: 1000px;
+  margin: auto;
 }
 </style>

@@ -1,10 +1,12 @@
 import * as tf from "@tensorflow/tfjs";
 
-function maxwell(fields, dx, dt) {
+function maxwell(fields, dx, dt, t, w) {
+  // Constant for axis index
   const X = 0;
   const Y = 1;
   const Z = 2;
 
+  // Compute del x E = - u dH/dt
   let temp = tf.tidy(() => {
     const dEdx = fields.E.slice([0, 1, 0])
       .pad([
@@ -34,7 +36,8 @@ function maxwell(fields, dx, dt) {
     return tf.clipByValue(
       fields.H.sub(curlE.div(dx).div(fields.u).mul(dt).mul(fields.dilation))
         .mul(fields.attenuation)
-        .mul(0.999),
+        .mul(fields.absorption)
+        .mul(0.9999),
       -1e10,
       1e10
     );
@@ -43,6 +46,7 @@ function maxwell(fields, dx, dt) {
   tf.dispose(fields.H);
   fields.H = temp;
 
+  // Compute del x E = - u dH/dt
   temp = tf.tidy(() => {
     const dHdx = fields.H.sub(
       fields.H.slice([0, 0, 0], [-1, fields.H.shape[1] - 1, -1]).pad([
@@ -70,9 +74,21 @@ function maxwell(fields, dx, dt) {
     );
 
     return fields.E.add(
-      curlH.div(dx).div(fields.e).mul(dt).mul(fields.dilation)
-    ).mul(fields.attenuation);
+      fields.emission
+        .mul(tf.cos(t * w))
+        .mul(w / 10)
+        .mul(dt)
+        .pad([
+          [0, 0],
+          [0, 0],
+          [2, 0],
+        ])
+    )
+      .add(curlH.div(dx).div(fields.e).mul(dt).mul(fields.dilation))
+      .mul(fields.absorption)
+      .mul(fields.attenuation);
   });
+
   tf.dispose(fields.E);
   fields.E = temp;
 }
