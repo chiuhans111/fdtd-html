@@ -9,8 +9,18 @@
         <button @click="pause = true" v-if="!pause">pause</button>
         <button @click="pause = false" v-if="pause">continue</button>
         <button @click="clear">clear</button>
-        <button @click="add('rect')">add rect</button>
-        <button @click="add('circle')">add circle</button>
+        <input
+          type="checkbox"
+          name="integrate"
+          id="integrate"
+          v-model="integrate_mode"
+        />
+        <input type="text" v-model.number="wavelength" />
+        <div class="row">
+          <button @click="add('rect')">add rect</button>
+          <button @click="add('circle')">add circle</button>
+          <button @click="add('grating')">add grating</button>
+        </div>
         <div class="menu">
           <div class="menu_obj" v-for="(obj, i) in selected_object" :key="i">
             {{ obj }}
@@ -30,7 +40,7 @@
 
             <div class="row">
               <label>scaleX: </label>
-              <input type="text" v-model.number="obj.scaleX" size="6" />
+              <input type="text" v-model="obj.scaleX" size="6" />
               <label>scaleY: </label>
               <input type="text" v-model.number="obj.scaleY" size="6" />
             </div>
@@ -51,6 +61,13 @@
             <div class="row">
               <label>emission: </label>
               <input type="text" v-model.number="obj.emission" size="6" />
+            </div>
+
+            <div class="row" v-if="obj.type == 'grating'">
+              <label>period: </label>
+              <input type="text" v-model.number="obj.period" size="6" />
+              <label>fillfactor: </label>
+              <input type="text" v-model.number="obj.fillfactor" size="6" />
             </div>
 
             <div class="row">
@@ -74,9 +91,12 @@
     left: 0;
   }
 
+  #fabric {
+    filter: brightness(0.9) contrast(0.9) grayscale(0.1);
+  }
+
   #wave {
     background-color: black;
-    border: solid 1px gray;
     pointer-events: none;
     mix-blend-mode: screen;
   }
@@ -102,17 +122,27 @@ import * as tf from "@tensorflow/tfjs";
 import FDTD from "../FDTD/fdtd";
 import { fabric } from "fabric";
 import { toRaw } from "vue";
+import { Grating } from "../customshapes";
 
 function norm_draw(data) {
   return tf.tidy(() => {
     const max_val = 0.1; //tf.max(tf.abs(data));
     const normalize = data.div(max_val).expandDims(2);
     return tf
-      .concat([normalize, normalize.abs(), normalize.mul(-1)], 2)
+      .concat([normalize, normalize.abs().mul(0.5), normalize.mul(-1)], 2)
       .clipByValue(0, 1);
   });
 
   // return data.mul(20).clipByValue(0.5, 1.5).sub(0.5);
+}
+
+function intensity_draw(data) {
+  return tf.tidy(() => {
+    const intensity = data.mul(0.5).pow(2).sum(2).expandDims(2).log().mul(0.3);
+    return tf
+      .concat([intensity.mul(1), intensity.mul(0.6), intensity.mul(0.4)], 2)
+      .clipByValue(0, 1);
+  });
 }
 
 function inject_optics_prop(obj, index = 1.33, absorption = 0, emission = 0) {
@@ -125,6 +155,7 @@ function inject_optics_prop(obj, index = 1.33, absorption = 0, emission = 0) {
 const fdtd = new FDTD();
 window.fields = fdtd.fields;
 let canvas_fabric = null;
+
 export default {
   data() {
     const data = {
@@ -142,6 +173,9 @@ export default {
       pause: false,
 
       selected_object: [],
+      wavelength: 10,
+
+      integrate_mode: false,
     };
 
     return data;
@@ -210,7 +244,14 @@ export default {
           fill: "red",
           width: 100,
           height: 100,
-          radius: 100,
+        });
+        inject_optics_prop(obj);
+        canvas_fabric.add(obj);
+      } else if (type == "grating") {
+        const obj = new Grating({
+          fill: "red",
+          width: 100,
+          height: 100,
         });
         inject_optics_prop(obj);
         canvas_fabric.add(obj);
@@ -328,9 +369,20 @@ export default {
       //   fdtd.fields.e.gather(2, 2).clipByValue(0, 1),
       //   this.canvas
       // );
-      tf.browser.toPixels(norm_draw(fdtd.fields.E.gather(2, 2)), this.canvas);
+
+      if (this.integrate_mode) {
+        tf.browser.toPixels(intensity_draw(fdtd.fields.power), this.canvas);
+      } else {
+        tf.browser.toPixels(norm_draw(fdtd.fields.E.gather(2, 2)), this.canvas);
+      }
 
       tf.engine().endScope();
+    },
+  },
+  watch: {
+    wavelength() {
+      console.log("wavelength changed to", this.wavelength);
+      fdtd.settings.wavelength = this.wavelength;
     },
   },
 };

@@ -91,6 +91,18 @@ function maxwell(fields, dx, dt, t, w) {
 
   tf.dispose(fields.E);
   fields.E = temp;
+
+  temp = tf.tidy(() => {
+    let ez = fields.E.gather(Z, 2).expandDims(2);
+
+    return tf
+      .concat([ez.mul(tf.cos(t * w)), ez.mul(tf.sin(t * w))], 2)
+      .mul(dt)
+      .add(fields.power)
+      .mul(0.998);
+  });
+  tf.dispose(fields.power);
+  fields.power = temp;
 }
 
 export default maxwell;

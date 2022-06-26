@@ -9,14 +9,18 @@ function FDTD(
   dt = 0.3
 ) {
   this.t = 0;
-  this.w = 0.3;
+
+  this.dx = dx;
+  this.dt = dt;
+
+  this.settings = {
+    wavelength: 10,
+  };
+
   this.pixel_W = pixel_W;
   this.pixel_H = pixel_H;
   this.sim_W = pixel_W + border_size * 2;
   this.sim_H = pixel_H + border_size * 2;
-
-  this.dx = dx;
-  this.dt = dt;
 
   const W = this.sim_W * dx;
   const H = this.sim_H * dx;
@@ -43,6 +47,7 @@ function FDTD(
     H: tf.zeros([this.sim_H, this.sim_W, 3]),
     e: tf.ones([this.sim_H, this.sim_W, 1]),
     u: tf.ones([this.sim_H, this.sim_W, 1]),
+    power: tf.zeros([this.sim_H, this.sim_W, 2]),
     gx: grid[0],
     gy: grid[1],
     // border,
@@ -53,16 +58,22 @@ function FDTD(
   };
 
   this.clear = function () {
+    this.t = 0;
     this.fields.E.dispose();
     this.fields.E = tf.zeros([this.sim_H, this.sim_W, 3]);
     this.fields.H.dispose();
     this.fields.H = tf.zeros([this.sim_H, this.sim_W, 3]);
+    this.fields.power.dispose();
+    this.fields.power = tf.zeros([this.sim_H, this.sim_W, 2]);
   };
 
   this.update = function () {
+    const w = (2 * Math.PI) / this.settings.wavelength;
+    const dt = Math.min(0.5, this.settings.wavelength / 10);
+
     for (let i = 0; i < 5; i++) {
-      this.t += this.dt;
-      maxwell(this.fields, this.dx, this.dt, this.t, this.w);
+      this.t += dt;
+      maxwell(this.fields, this.dx, dt, this.t, w);
     }
 
     for (let i in this.fields) {
