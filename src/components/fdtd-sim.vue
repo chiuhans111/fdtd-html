@@ -6,16 +6,24 @@
         <canvas id="wave" ref="canvas"> </canvas>
       </div>
       <div>
-        <button @click="pause = true" v-if="!pause">pause</button>
-        <button @click="pause = false" v-if="pause">continue</button>
-        <button @click="clear">clear</button>
-        <input
-          type="checkbox"
-          name="integrate"
-          id="integrate"
-          v-model="integrate_mode"
-        />
-        <input type="text" v-model.number="wavelength" />
+        <div class="row">
+          <button @click="pause = true" v-if="!pause">pause</button>
+          <button @click="pause = false" v-if="pause">continue</button>
+          <button @click="clear">clear</button>
+        </div>
+        <div class="row">
+          <input type="checkbox" name="integrate" v-model="integrate_mode" />
+          <label for="integrate">Integrate Mode</label>
+        </div>
+        <div class="row">
+          <label for="wavelength">wavelength: </label>
+          <input
+            type="text"
+            name="wavelength"
+            v-model.number="wavelength"
+            size="6"
+          />
+        </div>
         <div class="row">
           <button @click="add('rect')">add rect</button>
           <button @click="add('circle')">add circle</button>

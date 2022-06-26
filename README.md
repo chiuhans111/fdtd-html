@@ -1,5 +1,13 @@
 # fdtd-html
+This is an experimental project, for a real-time demonstration of EM waves.
 
+I hope this project can help students visualize wave propagation, help teachers explain complex wave phenomena, and get people interested in this field.
+
+Contribution is welcome but it's still in the prototype stage.
+
+Vue 3 + TensorFlow.js + Fabric.js
+
+# Vue generated readme
 This template should help get you started developing with Vue 3 in Vite.
 
 ## Recommended IDE Setup
