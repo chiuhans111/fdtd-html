@@ -7,6 +7,8 @@ Contribution is welcome but it's still in the prototype stage.
 
 Vue 3 + TensorFlow.js + Fabric.js
 
+Demo at: https://chiuhans111.github.io/fdtd-html/index.html
+
 # Vue generated readme
 This template should help get you started developing with Vue 3 in Vite.
 
