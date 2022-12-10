@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.21.0",
-    "fabric": "^5.2.1",
+    "fabric": "^5.2.4",
     "vue": "^3.2.36"
   },
   "devDependencies": {

@@ -1,0 +1,47 @@
+button {
+    background-color: #eee;
+    border: solid 1px #ddd;
+    padding: 6px;
+    border-radius: 3px;
+    margin: 3px;
+    font-weight: bold;
+
+    &:hover {
+        background-color: white;
+    }
+
+    &:active {
+        background-color: #ddd;
+    }
+}
+
+input {
+    background-color: #111;
+    color: white;
+    border: solid 1px #555;
+    padding: 2px;
+    border-radius: 3px;
+    margin: 0px 2px;
+    width: 60px;
+}
+
+.menu {
+    width: 300px;
+    margin-left: 10px;
+    background-color: #222;
+    padding: 10px;
+    border-radius: 5px;
+
+    &_obj {
+        border: solid 1px gray;
+        border-radius: 3px;
+        margin: 5px;
+        padding: 10px;
+    }
+}
+
+.row {
+    padding: 4px 0px;
+    display: flex;
+    flex-wrap: wrap;
+}

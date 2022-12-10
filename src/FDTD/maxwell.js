@@ -1,10 +1,10 @@
-import * as tf from "@tensorflow/tfjs";
+import * as tf from "@tensorflow/tfjs"
 
 function maxwell(fields, dx, dt, t, w) {
   // Constant for axis index
-  const X = 0;
-  const Y = 1;
-  const Z = 2;
+  const X = 0
+  const Y = 1
+  const Z = 2
 
   // Compute del x E = - u dH/dt
   let temp = tf.tidy(() => {
@@ -14,7 +14,7 @@ function maxwell(fields, dx, dt, t, w) {
         [0, 1],
         [0, 0],
       ])
-      .sub(fields.E);
+      .sub(fields.E)
 
     const dEdy = fields.E.slice([1, 0, 0])
       .pad([
@@ -22,7 +22,7 @@ function maxwell(fields, dx, dt, t, w) {
         [0, 0],
         [0, 0],
       ])
-      .sub(fields.E);
+      .sub(fields.E)
 
     const curlE = tf.concat(
       [
@@ -31,7 +31,7 @@ function maxwell(fields, dx, dt, t, w) {
         dEdx.gather(Y, 2).sub(dEdy.gather(X, 2)).expandDims(2),
       ],
       2
-    );
+    )
 
     return tf.clipByValue(
       fields.H.sub(curlE.div(dx).div(fields.u).mul(dt).mul(fields.dilation))
@@ -40,11 +40,11 @@ function maxwell(fields, dx, dt, t, w) {
         .mul(0.9999),
       -1e10,
       1e10
-    );
-  });
+    )
+  })
 
-  tf.dispose(fields.H);
-  fields.H = temp;
+  tf.dispose(fields.H)
+  fields.H = temp
 
   // Compute del x E = - u dH/dt
   temp = tf.tidy(() => {
@@ -54,7 +54,7 @@ function maxwell(fields, dx, dt, t, w) {
         [1, 0],
         [0, 0],
       ])
-    );
+    )
 
     const dHdy = fields.H.sub(
       fields.H.slice([0, 0, 0], [fields.H.shape[0] - 1, -1, -1]).pad([
@@ -62,7 +62,7 @@ function maxwell(fields, dx, dt, t, w) {
         [0, 0],
         [0, 0],
       ])
-    );
+    )
 
     const curlH = tf.concat(
       [
@@ -71,7 +71,7 @@ function maxwell(fields, dx, dt, t, w) {
         dHdx.gather(Y, 2).sub(dHdy.gather(X, 2)).expandDims(2),
       ],
       2
-    );
+    )
 
     return fields.E.add(
       fields.emission
@@ -86,23 +86,23 @@ function maxwell(fields, dx, dt, t, w) {
     )
       .add(curlH.div(dx).div(fields.e).mul(dt).mul(fields.dilation))
       .mul(fields.absorption)
-      .mul(fields.attenuation);
-  });
+      .mul(fields.attenuation)
+  })
 
-  tf.dispose(fields.E);
-  fields.E = temp;
+  tf.dispose(fields.E)
+  fields.E = temp
 
   temp = tf.tidy(() => {
-    let ez = fields.E.gather(Z, 2).expandDims(2);
+    let ez = fields.E.gather(Z, 2).expandDims(2)
 
     return tf
       .concat([ez.mul(tf.cos(t * w)), ez.mul(tf.sin(t * w))], 2)
       .mul(dt)
       .add(fields.power)
-      .mul(0.998);
-  });
-  tf.dispose(fields.power);
-  fields.power = temp;
+      .mul(0.998)
+  })
+  tf.dispose(fields.power)
+  fields.power = temp
 }
 
-export default maxwell;
+export default maxwell
