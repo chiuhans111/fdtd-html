@@ -1,6 +1,6 @@
 import * as tf from "@tensorflow/tfjs"
 import maxwell from "./maxwell"
-
+tf.enableProdMode()
 function FDTD(
   pixel_W = 600,
   pixel_H = 400,
