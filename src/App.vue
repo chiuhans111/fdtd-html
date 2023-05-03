@@ -1,5 +1,6 @@
 <script setup>
 import FdtdSim from "./components/fdtd-sim.vue"
+import HowTo from "./components/how-to.vue"
 </script>
 
 <template>
@@ -7,6 +8,9 @@ import FdtdSim from "./components/fdtd-sim.vue"
     <h1>FDTD simulator</h1>
     <div class="main">
       <FdtdSim></FdtdSim>
+    </div>
+    <div class="howto">
+      <HowTo></HowTo>
     </div>
     <div>
       <br>
